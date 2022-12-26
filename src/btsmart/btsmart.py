@@ -167,20 +167,19 @@ class InputMeasurement:
 
 
 class BTSmartController:
-    """This class represents a BTSmart-Controller, connected via BLE
-    """
+    """This class represents a BTSmart-Controller, connected via BLE"""
 
     async def discover(autoconnect: bool = True) -> BTSmartController:
-        """AI is creating summary for discover
+        """Start deicobery of bluetooth devices and try to find a BT-Smart Controller
 
         Args:
-            autoconnect (bool, optional): [description]. Defaults to True.
+            autoconnect (bool, optional): tells the controller to automatically connect if disconnected before performing any command. Defaults to True.
 
         Raises:
-            Exception: [description]
+            Exception: if there is not controller found
 
         Returns:
-            BTSmartController: [description]
+            BTSmartController: the found controller
         """
         devices = await BleakScanner.discover(return_adv=True)
         btSmartDevice = None
