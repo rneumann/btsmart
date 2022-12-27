@@ -2,7 +2,7 @@
 """
 Ths module provides simplified access to the FischerTechnik BT-Smart Controller
 using the bleak BLE API.
-The module heavily relies on asyncio 
+The module heavily relies on asyncio
 
 @Author: Rainer Neumann
 @Date: 2022-12-26
@@ -12,7 +12,6 @@ Todo:
     * Test Cross-OS compatibility
 
 """
-
 
 import asyncio
 from enum import Enum
@@ -24,72 +23,80 @@ except ModuleNotFoundError as e:
     print("You may install it via 'pip3 install bleak' ...");
     exit(-1);
 
-
 BT_SMART_GATT_UUIDs = {
     "device_info": {
         "uuid": "0000180a-0000-1000-8000-00805f9b34fb",
         "characteristics": {
-            "manufacturer": "00002a29-0000-1000-8000-00805f9b34fb", # String read  Val: bytearray(b'fischertechnik')
-            "model"       : "00002a24-0000-1000-8000-00805f9b34fb", # String read  Val: bytearray(b'161944')
-            "hardware"    : "00002a27-0000-1000-8000-00805f9b34fb", # String read  Val: bytearray(b'1\x00')
-            "firmware"    : "00002a26-0000-1000-8000-00805f9b34fb", # String read  Val: bytearray(b'1.63\x00\x00\x00\x00')
-            "sysid"       : "00002a23-0000-1000-8000-00805f9b34fb"  # bytes  read  Val: bytearray(b'\x00\x00\x00\x00\x00\xf8E\x10')
+            "manufacturer": "00002a29-0000-1000-8000-00805f9b34fb",  # String read  Val: bytearray(b'fischertechnik')
+            "model": "00002a24-0000-1000-8000-00805f9b34fb",  # String read  Val: bytearray(b'161944')
+            "hardware": "00002a27-0000-1000-8000-00805f9b34fb",  # String read  Val: bytearray(b'1\x00')
+            "firmware": "00002a26-0000-1000-8000-00805f9b34fb",  # String read  Val: bytearray(b'1.63\x00\x00\x00\x00')
+            "sysid": "00002a23-0000-1000-8000-00805f9b34fb"
+            # bytes  read  Val: bytearray(b'\x00\x00\x00\x00\x00\xf8E\x10')
         }
     },
     "battery": {
         "uuid": "0000180f-0000-1000-8000-00805f9b34fb",
         "characteristics": {
-            "level": "00002a19-0000-1000-8000-00805f9b34fb" # read,notify  Val: bytearray(b'd')
+            "level": "00002a19-0000-1000-8000-00805f9b34fb"  # read,notify  Val: bytearray(b'd')
         }
     },
     "led": {
         "uuid": "8ae87702-ad7d-11e6-80f5-76304dec7eb7",
         "characteristics": {
-            "color": "8ae87e32-ad7d-11e6-80f5-76304dec7eb7" # read,write-without-response,write  Val: bytearray(b'\x00') -- 00 = blue, 01 = orange
+            "color": "8ae87e32-ad7d-11e6-80f5-76304dec7eb7"
+            # read,write-without-response,write  Val: bytearray(b'\x00') -- 00 = blue, 01 = orange
         }
     },
     "output": {
         "uuid": "8ae883b4-ad7d-11e6-80f5-76304dec7eb7",
         "characteristics": {
-            1: "8ae8860c-ad7d-11e6-80f5-76304dec7eb7", # read,write-without-response,write  Val: bytearray(b'\x00') -- valid range: –100..100
-            2: "8ae88b84-ad7d-11e6-80f5-76304dec7eb7"  # read,write-without-response,write  Val: bytearray(b'\x00') -- valid range: –100..100
+            1: "8ae8860c-ad7d-11e6-80f5-76304dec7eb7",
+            # read,write-without-response,write  Val: bytearray(b'\x00') -- valid range: –100..100
+            2: "8ae88b84-ad7d-11e6-80f5-76304dec7eb7"
+            # read,write-without-response,write  Val: bytearray(b'\x00') -- valid range: –100..100
         }
     },
     "input_mode": {
         "uuid": "8ae88d6e-ad7d-11e6-80f5-76304dec7eb7",
-        "characteristics": {   ## 1 byte: 0x0a = voltage, 0x0b = resistance 
-            1: "8ae88efe-ad7d-11e6-80f5-76304dec7eb7", # read,write  Val: bytearray(b'\x0b')
-            2: "8ae89084-ad7d-11e6-80f5-76304dec7eb7", # read,write  Val: bytearray(b'\x0b')
-            3: "8ae89200-ad7d-11e6-80f5-76304dec7eb7", # read,write  Val: bytearray(b'\x0b')
+        "characteristics": {  ## 1 byte: 0x0a = voltage, 0x0b = resistance
+            1: "8ae88efe-ad7d-11e6-80f5-76304dec7eb7",  # read,write  Val: bytearray(b'\x0b')
+            2: "8ae89084-ad7d-11e6-80f5-76304dec7eb7",  # read,write  Val: bytearray(b'\x0b')
+            3: "8ae89200-ad7d-11e6-80f5-76304dec7eb7",  # read,write  Val: bytearray(b'\x0b')
             4: "8ae89386-ad7d-11e6-80f5-76304dec7eb7"  # read,write  Val: bytearray(b'\x0b')
         }
     },
     "input": {
         "uuid": "8ae8952a-ad7d-11e6-80f5-76304dec7eb7",
-        "characteristics": {   ## 2 bytes: value in ohms or volt 
-            1: "8ae89a2a-ad7d-11e6-80f5-76304dec7eb7", # read,notify  Val: bytearray(b'\xff\xff')
-            2: "8ae89bec-ad7d-11e6-80f5-76304dec7eb7", # read,notify  Val: bytearray(b'\xff\xff')
-            3: "8ae89dc2-ad7d-11e6-80f5-76304dec7eb7", # read,notify  Val: bytearray(b'\xff\xff')
+        "characteristics": {  ## 2 bytes: value in ohms or volt
+            1: "8ae89a2a-ad7d-11e6-80f5-76304dec7eb7",  # read,notify  Val: bytearray(b'\xff\xff')
+            2: "8ae89bec-ad7d-11e6-80f5-76304dec7eb7",  # read,notify  Val: bytearray(b'\xff\xff')
+            3: "8ae89dc2-ad7d-11e6-80f5-76304dec7eb7",  # read,notify  Val: bytearray(b'\xff\xff')
             4: "8ae89f66-ad7d-11e6-80f5-76304dec7eb7"  # read,notify  Val: bytearray(b'\xff\xff')
         }
     }
 }
 
-#----------------- some forward declarations ----------------
+
+# ----------------- some forward declarations ----------------
 
 class LED_Mode(Enum):
     pass
 
+
 class InputMode(Enum):
     pass
+
 
 class InputMeasurement:
     pass
 
+
 class BTSmartController:
     pass
 
-#----------------- relevant classes start here ------------------------
+
+# ----------------- relevant classes start here ------------------------
 
 class LED_Mode(Enum):
     """Enumeration of the BTSmart internal LED Colors"""
@@ -127,7 +134,7 @@ class InputMode(Enum):
     INPUT_MODE_LABEL = {
         VOLTAGE: "Volt",
         RESISTANCE: "Ohm"
-    }  
+    }
 
     def from_bytes(b: bytes) -> InputMode:
         """derive the input mode from a given binary representation (received via BLE)
@@ -146,8 +153,10 @@ class InputMode(Enum):
             else:
                 return None
 
+
 class InputMeasurement:
     """Simple object containing a measurement value and unit """
+
     def __init__(self, value: int, unit: InputMode) -> InputMeasurement:
         """creates a measurement with the given value and unit
 
@@ -160,6 +169,7 @@ class InputMeasurement:
         """
         self.value = value
         self.unit = unit
+
     def __str__(self):
         """simple format using readable unit identifiers"""
         return str(self.value) + " " + InputMode.INPUT_MODE_LABEL[self.unit]
@@ -190,8 +200,8 @@ class BTSmartController:
         else:
             print(btSmartDevice.name, "-", btSmartDevice.address)
             return BTSmartController(btSmartDevice, autoconnect=autoconnect)
-    
-    async def find(address, autoconnect:bool = True) -> BTSmartController:
+
+    async def find(address, autoconnect: bool = True) -> BTSmartController:
         btSmartDevice = await BleakScanner.find_device_by_address(address)
         if btSmartDevice is None:
             raise Exception("BT Smart Controller not found")
@@ -202,17 +212,17 @@ class BTSmartController:
     def __init__(self, device, autoconnect: bool = True) -> None:
         self.client = BleakClient(device, disconnected_callback=self.on_disconnect)
         self.autoconnect = autoconnect
-        self.input_listener = { 1:None, 2:None, 3:None, 4:None }
-    
+        self.input_listener = {1: None, 2: None, 3: None, 4: None}
+
     def on_disconnect(self, client) -> None:
         pass
-    
+
     async def _handle_input_change(self, characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
         value = int.from_bytes(data, 'little', signed=False)
         for num, uuid in BT_SMART_GATT_UUIDs["input"]["characteristics"].items():
             if characteristic.uuid == uuid:
                 await self._on_input_value_changed(num, value)
-    
+
     async def _on_input_value_changed(self, input: int, value: int) -> None:
         callback = self.input_listener[input]
         if callback is not None:
@@ -228,7 +238,7 @@ class BTSmartController:
         if not self.is_connected():
             await self.client.connect()
         if self.is_connected():
-            for number in range(1,5):
+            for number in range(1, 5):
                 measureUuid = BT_SMART_GATT_UUIDs["input"]["characteristics"][number]
                 await self.client.start_notify(measureUuid, self._handle_input_change)
             return True
@@ -288,9 +298,9 @@ class BTSmartController:
             unit = InputMode.from_bytes(u_bts)
         m_bts = await self.client.read_gatt_char(measureUuid)
         value = int.from_bytes(m_bts, 'little', signed=False)
-        #print("chars:", m_bts, "->", value)
+        # print("chars:", m_bts, "->", value)
         return InputMeasurement(value, unit)
-        
+
     def on_input_change(self, number: int, callback) -> None:
         if number < 1 or number > 4:
             raise Exception("invalid input number - must be in 1..4")

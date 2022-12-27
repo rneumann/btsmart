@@ -1,2 +1,2 @@
-bleak
--e .
+bleak~=0.19.5
+setuptools~=60.2.0

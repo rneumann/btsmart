@@ -5,7 +5,7 @@ BT-Smart
 :Authors:
     Prof. Dr. Rainer Neumann
 
-:Version: 0.1.0 of 2022/12/26
+:Version: 0.0.1 of 2022/12/26
 
 A small library that helps to build simple projects based on the Fischertechnik BT-Smart Controller
 using Bluetooth LE.
