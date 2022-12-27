@@ -25,8 +25,7 @@ Then we can use the library like this
 .. code-block:: python
 
     import asyncio
-    from btsmart import BTSmartController
-    from btsmartparts import Button, Dimmer, MotorXM
+    from btsmart import BTSmartController, Button, Dimmer, MotorXM
 
     btn = Button()
     dim = Dimmer()

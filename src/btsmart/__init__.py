@@ -3,5 +3,5 @@
 __author__ = """Rainer Neumann"""
 __email__ = "rainer.neumann@h-ka.de"
 
-from btsmart import *
-from btsmartparts import *
+from btsmart_core import *
+from btsmart_parts import *
