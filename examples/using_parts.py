@@ -1,5 +1,6 @@
 import asyncio
-from btsmart import BTSmartController, Button, Dimmer, MotorXM
+from btsmart import BTSmartController
+from btsmart import Button, Dimmer, MotorXM
 
 btn = Button()
 dim = Dimmer()
@@ -9,7 +10,6 @@ async def butten_pressed():
     print("Button pressed")
     await asyncio.gather(
         dim.set_level(100),
-#        dim.blink(5),
         motor.run_at(speed=150, time=0.5)
     )
 

@@ -1,5 +1,5 @@
 import asyncio
-from btsmart import BTSmartController, LED_Mode, InputUnit, InputMeasurement
+from btsmart.controller import BTSmartController, LED_Mode, InputMode, InputMeasurement
 
 #------------------------------------------------------------------------------------------------------------
 
@@ -23,8 +23,8 @@ async def main():
         await asyncio.sleep(0.5)
         await btSmart.set_led(LED_Mode.ORANGE)
 
-        await btSmart.set_input_mode(2, InputUnit.VOLTAGE)
-        await btSmart.set_input_mode(4, InputUnit.VOLTAGE)
+        await btSmart.set_input_mode(2, InputMode.VOLTAGE)
+        await btSmart.set_input_mode(4, InputMode.VOLTAGE)
 
         async def on_input_change(num, value):
             print("Input", num, "changed to", value)

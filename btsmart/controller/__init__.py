@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Ths module provides simplified access to the FischerTechnik BT-Smart Controller
+Ths module provides simplified access to the Fischertechnik BT-Smart Controller
 using the bleak BLE API.
 The module heavily relies on asyncio
 
@@ -103,11 +103,6 @@ class LED_Mode(Enum):
     ORANGE = bytearray(b'\x00')
     BLUE = bytearray(b'\x01')
 
-    LED_Label = {
-        ORANGE: "Orange",
-        BLUE: "Blue"
-    }
-
     def from_bytes(b: bytes) -> LED_Mode:
         """derive the color from a given binary representation (received via BLE)
 
@@ -125,16 +120,16 @@ class LED_Mode(Enum):
             else:
                 return None
 
+LED_Label = {
+    LED_Mode.ORANGE: "Orange",
+    LED_Mode.BLUE: "Blue"
+}
+
 
 class InputMode(Enum):
     """Enumeration of the input measurement modes"""
     VOLTAGE = b'\x0a'
     RESISTANCE = b'\x0b'
-
-    INPUT_MODE_LABEL = {
-        VOLTAGE: "Volt",
-        RESISTANCE: "Ohm"
-    }
 
     def from_bytes(b: bytes) -> InputMode:
         """derive the input mode from a given binary representation (received via BLE)
@@ -153,6 +148,10 @@ class InputMode(Enum):
             else:
                 return None
 
+INPUT_MODE_LABEL = {
+    InputMode.VOLTAGE: "Volt",
+    InputMode.RESISTANCE: "Ohm"
+}
 
 class InputMeasurement:
     """Simple object containing a measurement value and unit """
@@ -172,7 +171,7 @@ class InputMeasurement:
 
     def __str__(self):
         """simple format using readable unit identifiers"""
-        return str(self.value) + " " + InputMode.INPUT_MODE_LABEL[self.unit]
+        return str(self.value) + " " + INPUT_MODE_LABEL[self.unit]
 
 
 class BTSmartController:
