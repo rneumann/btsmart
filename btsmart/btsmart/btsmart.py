@@ -95,7 +95,12 @@ class LED_Mode(Enum):
     """Enumeration of the BTSmart internal LED Colors"""
     ORANGE = bytearray(b'\x00')
     BLUE = bytearray(b'\x01')
-    
+
+    LED_Label = {
+        ORANGE: "Orange",
+        BLUE: "Blue"
+    }
+
     def from_bytes(b: bytes) -> LED_Mode:
         """derive the color from a given binary representation (received via BLE)
 
@@ -113,16 +118,16 @@ class LED_Mode(Enum):
             else:
                 return None
 
-LED_Label = {
-    LED_Mode.ORANGE: "Orange",
-    LED_Mode.BLUE: "Blue"
-}
-
 
 class InputMode(Enum):
     """Enumeration of the input measurement modes"""
     VOLTAGE = b'\x0a'
     RESISTANCE = b'\x0b'
+
+    INPUT_MODE_LABEL = {
+        VOLTAGE: "Volt",
+        RESISTANCE: "Ohm"
+    }  
 
     def from_bytes(b: bytes) -> InputMode:
         """derive the input mode from a given binary representation (received via BLE)
@@ -141,12 +146,6 @@ class InputMode(Enum):
             else:
                 return None
 
-INPUT_MODE_LABEL = {
-    InputMode.VOLTAGE: "Volt",
-    InputMode.RESISTANCE: "Ohm"
-}  
-
-
 class InputMeasurement:
     """Simple object containing a measurement value and unit """
     def __init__(self, value: int, unit: InputMode) -> InputMeasurement:
@@ -163,7 +162,7 @@ class InputMeasurement:
         self.unit = unit
     def __str__(self):
         """simple format using readable unit identifiers"""
-        return str(self.value) + " " + INPUT_MODE_LABEL[self.unit]
+        return str(self.value) + " " + InputMode.INPUT_MODE_LABEL[self.unit]
 
 
 class BTSmartController:
