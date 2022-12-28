@@ -14,7 +14,7 @@ Todo:
 """
 
 import asyncio
-from btsmart.controller import BTSmartController
+from controller import BTSmartController
 
 class ElectronicsPart:
     def __init__(self) -> None:

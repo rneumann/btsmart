@@ -1,5 +1,5 @@
 import asyncio
-from btsmart.controller import BTSmartController, LED_Mode, InputMode, InputMeasurement
+from btsmart import BTSmartController, LED_Mode, InputMode, InputMeasurement
 
 #------------------------------------------------------------------------------------------------------------
 
@@ -34,37 +34,15 @@ async def main():
             else:
                 await btSmart.set_output_value(1, 0)
                 await btSmart.set_led(LED_Mode.ORANGE)
-            #measures = ""
-            #for j in range(1,5):
-            #    m: InputMeasurement = await btSmart.get_input(j, InputUnit.RESISTANCE)
-            #    measures = measures + str(j) + ": " + str(m) + ";   "
-            #print(">>", measures)
-
-        btSmart.on_input_change(1, on_input_change)
-
-
-        await asyncio.sleep(10)
-
-        """
-        m1Val = 0
-
-        for i in range(20):
             measures = ""
             for j in range(1,5):
                 m: InputMeasurement = await btSmart.get_input(j, InputUnit.RESISTANCE)
                 measures = measures + str(j) + ": " + str(m) + ";   "
+            print(">>", measures)
 
-            print(i, ">>", measures)
+        btSmart.on_input_change(1, on_input_change)
 
-            m1Val = 100 - m1Val
-            await btSmart.set_output_value(1, m1Val)
-            #await btSmart.set_output_value(2, m1Val)
-            print("output 1: ", await btSmart.get_output_value(1))
-
-            await asyncio.sleep(0.2)
-
-
-        """
+        await asyncio.sleep(10)
 
         await btSmart.disconnect()
 
