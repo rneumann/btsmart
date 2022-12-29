@@ -209,6 +209,12 @@ class BTSmartController:
             return BTSmartController(btSmartDevice, autoconnect=autoconnect)
 
     def __init__(self, device, autoconnect: bool = True) -> None:
+        """Initializes the controller instance using the detected device.
+
+        Args:
+            device (BLEDevice): the device
+            autoconnect (bool, optional): should the controller automatically connect to the device. Defaults to True.
+        """
         self.client = BleakClient(device, disconnected_callback=self.on_disconnect)
         self.autoconnect = autoconnect
         self.input_listener = {1: None, 2: None, 3: None, 4: None}
@@ -217,12 +223,26 @@ class BTSmartController:
         pass
 
     async def _handle_input_change(self, characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
+        """callback that is called after a notifyable characteristic in the BLE Device changed.
+        This method simply calls the specific input handler.
+
+        Args:
+            characteristic (BleakGATTCharacteristic): the changed characteristic
+            data (bytearray): the new data of the characteristic
+        """
         value = int.from_bytes(data, 'little', signed=False)
         for num, uuid in BT_SMART_GATT_UUIDs["input"]["characteristics"].items():
             if characteristic.uuid == uuid:
                 await self._on_input_value_changed(num, value)
 
     async def _on_input_value_changed(self, input: int, value: int) -> None:
+        """callback that is called whenever a certain input value changes. This method is called by the raw input handler above and
+        in turn notifies the registered input listener.
+
+        Args:
+            input (int): the input number (1..4)
+            value (int): the new value
+        """
         callback = self.input_listener[input]
         if callback is not None:
             if asyncio.iscoroutinefunction(callback):
@@ -231,9 +251,22 @@ class BTSmartController:
                 callback(input, value)
 
     def is_connected(self) -> bool:
+        """indicates whether or not the controller is currently connected
+
+        Returns:
+            bool: True iff the controller is currently connected to BLE device
+        """
         return self.client.is_connected
 
     async def connect(self) -> bool:
+        """connects the controller to the BLE device.
+
+        Raises:
+            Exception: if the connection could not be established
+
+        Returns:
+            bool: True after the connection has been established
+        """
         if not self.is_connected():
             await self.client.connect()
         if self.is_connected():
@@ -245,10 +278,12 @@ class BTSmartController:
             raise Exception("unable to connect")
 
     async def disconnect(self) -> None:
+        """disconnects the controller from the BLE device"""
         if self.is_connected():
             await self.client.disconnect()
 
     async def _autoconnect(self) -> None:
+        """convenience-method that checks if we should automatically connect to the device (ad-hoc) and optionally connects"""
         if not self.is_connected():
             if self.autoconnect:
                 await self.connect()
@@ -256,6 +291,11 @@ class BTSmartController:
                 raise Exception("Device not connected")
 
     async def get_device_information(self) -> dict[str, str]:
+        """retrieves device information from the attached BT-Smart Controller
+
+        Returns:
+            dict[str, str]: a dictionary containing information for the keys "manufacturer", "model", "hardware", "firmware" and "sysid"
+        """
         await self._autoconnect()
         res = dict()
         for key, uuid in BT_SMART_GATT_UUIDs["device_info"]["characteristics"].items():
@@ -266,11 +306,21 @@ class BTSmartController:
         return res
 
     async def set_led(self, led: LED_Mode) -> None:
+        """choses the LED on the controller
+
+        Args:
+            led (LED_Mode): the LED to be used
+        """
         ledUuid = BT_SMART_GATT_UUIDs["led"]["characteristics"]["color"]
         bts = led.value
         await self.client.write_gatt_char(ledUuid, bts)
 
     async def get_led(self) -> LED_Mode:
+        """get the currently used LED
+
+        Returns:
+            LED_Mode: the currently used LED
+        """
         ledUuid = BT_SMART_GATT_UUIDs["led"]["characteristics"]["color"]
         bts = await self.client.read_gatt_char(ledUuid)
         print(">>>led: ", bts)
@@ -278,6 +328,7 @@ class BTSmartController:
         return led
 
     async def set_input_mode(self, number: int, unit: InputMode) -> None:
+        """set the input mode of the given input to either "voltage" or "resitance" """
         if number < 1 or number > 4:
             raise Exception("invalid input number - must be in 1..4")
         unitUuid = BT_SMART_GATT_UUIDs["input_mode"]["characteristics"][number]
@@ -285,6 +336,18 @@ class BTSmartController:
         await self.client.write_gatt_char(unitUuid, u_bts)
 
     async def get_input(self, number: int, unit: InputMode = None) -> InputMeasurement:
+        """retrieves the current measure on the given input
+
+        Args:
+            number (int): th input number
+            unit (InputMode, optional): the mode to be used for measurement. Defaults to None.
+
+        Raises:
+            Exception: if the input number is incorrect (must be 1..4)
+
+        Returns:
+            InputMeasurement: the object containing value and unit
+        """
         if number < 1 or number > 4:
             raise Exception("invalid input number - must be in 1..4")
         unitUuid = BT_SMART_GATT_UUIDs["input_mode"]["characteristics"][number]
@@ -297,15 +360,35 @@ class BTSmartController:
             unit = InputMode.from_bytes(u_bts)
         m_bts = await self.client.read_gatt_char(measureUuid)
         value = int.from_bytes(m_bts, 'little', signed=False)
-        # print("chars:", m_bts, "->", value)
         return InputMeasurement(value, unit)
 
     def on_input_change(self, number: int, callback) -> None:
+        """registers a listener for the given input. Currently, there is only one listener allowed.
+        A callback function might be a normal function or an async function that takes two arguments, the number of the input and the value.
+        
+        e.g. [async] def callback(input: int, value: int)
+
+        Args:
+            number (int): the input number (must be 1..4)
+            callback (function): the callback function
+
+        Raises:
+            Exception: if the input number is invalid
+        """
         if number < 1 or number > 4:
             raise Exception("invalid input number - must be in 1..4")
         self.input_listener[number] = callback
 
     async def set_output_value(self, number: int, value: int) -> None:
+        """sets the output value of the given pin to the given value
+
+        Args:
+            number (int): the output number (1 or 2)
+            value (int): the value to be set (must be in the range -100..100)
+
+        Raises:
+            Exception: if either output number or the value is invalid 
+        """
         if number < 1 or number > 2:
             raise Exception("invalid input number - must be in 1..2")
         if value < int(-100) or value > int(100):
@@ -313,7 +396,18 @@ class BTSmartController:
         bts = value.to_bytes(2, 'little', signed=True)
         await self.client.write_gatt_char(BT_SMART_GATT_UUIDs["output"]["characteristics"][number], bts)
 
-    async def get_output_value(self, number: int) -> None:
+    async def get_output_value(self, number: int) -> int:
+        """retrieves the current output value
+
+        Args:
+            number (int): the output number (must be 1..2)
+
+        Raises:
+            Exception: if the output number is invalid
+
+        Returns:
+            int: the value that is currently set for the output
+        """
         if number < 1 or number > 2:
             raise Exception("invalid input number - must be in 1..2")
         bts = await self.client.read_gatt_char(BT_SMART_GATT_UUIDs["output"]["characteristics"][number])
