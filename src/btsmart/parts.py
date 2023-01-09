@@ -145,6 +145,10 @@ class Dimmer(OutputPart):
             raise Exception("Invalid count - must be greater than 0")
         for c in range(count):
             await self.controller.set_output_value(self.outpin, level)
+            print("1")
+            await asyncio.sleep(time)
+            await self.controller.set_output_value(self.outpin, 0)
+            print("0")
             if c < count - 1:
                 await asyncio.sleep(time)
 
