@@ -36,7 +36,7 @@ async def main():
                 await btSmart.set_led(LED_Mode.ORANGE)
             measures = ""
             for j in range(1,5):
-                m: InputMeasurement = await btSmart.get_input(j, InputUnit.RESISTANCE)
+                m: InputMeasurement = await btSmart.get_input_value(j, InputUnit.RESISTANCE)
                 measures = measures + str(j) + ": " + str(m) + ";   "
             print(">>", measures)
 

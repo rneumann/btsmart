@@ -8,13 +8,12 @@ according logic.
 
 Todo:
     * Add more convenience functionality - more parts
-    * Needs a lot more tests
-    * blink in Dimmer does not yet work
+    * need an ideo of how to automatically set the right iput mode for a part (protocol problem with attach and connect)
 
 """
 
 import asyncio
-from controller import BTSmartController
+from .controller import BTSmartController, InputMode
 
 class ElectronicsPart:
     def __init__(self) -> None:
@@ -60,6 +59,10 @@ class Switch(InputPart):
     def __init__(self) -> None:
         super().__init__()
         self.threshold = 200
+
+#    def attach(self, ctrl: BTSmartController, number: int) -> None:
+#        super().attach(ctrl, number)
+#        ctrl.set_input_mode(number, InputMode.RESISTANCE)
 
     def is_open(self) -> bool:
         if self.lastValue is not None:

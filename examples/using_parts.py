@@ -27,17 +27,17 @@ async def main():
     try:
         btSmart = await BTSmartController.discover()
     except Exception:
-        btSmart = None
+        print("No controller found - please press the connect button on the device")
+        return
 
-    if btSmart is not None:
-        btn.attach(btSmart, 1)
-        dim.attach(btSmart, 1)
-        motor.attach(btSmart, 2)
+    btn.attach(btSmart, 1)
+    dim.attach(btSmart, 1)
+    motor.attach(btSmart, 2)
 
-        await btSmart.connect()
+    await btSmart.connect()
 
-        await asyncio.sleep(20)
+    await asyncio.sleep(20)
 
-        await btSmart.disconnect()
+    await btSmart.disconnect()
 
 asyncio.run(main())

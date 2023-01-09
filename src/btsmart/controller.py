@@ -8,8 +8,8 @@ The module heavily relies on asyncio
 @Date: 2022-12-26
 
 Todo:
-    * Make discovery more convenient
     * Test Cross-OS compatibility
+    * Reading output values does not yet work (currently only workaround)
 
 """
 
@@ -17,7 +17,7 @@ import asyncio
 from enum import Enum
 
 try:
-    from bleak import BleakScanner, BleakClient, BleakGATTCharacteristic
+    from bleak import BleakScanner, BleakClient, BleakGATTCharacteristic, BLEDevice, AdvertisementData
 except ModuleNotFoundError as e:
     print("Error loading bleak module:", e);
     print("You may install it via 'pip3 install bleak' ...");
@@ -100,8 +100,8 @@ class BTSmartController:
 
 class LED_Mode(Enum):
     """Enumeration of the BTSmart internal LED Colors"""
-    ORANGE = bytearray(b'\x00')
-    BLUE = bytearray(b'\x01')
+    BLUE = bytearray(b'\x00')
+    ORANGE = bytearray(b'\x01')
 
     def from_bytes(b: bytes) -> LED_Mode:
         """derive the color from a given binary representation (received via BLE)
@@ -120,7 +120,7 @@ class LED_Mode(Enum):
             else:
                 return None
 
-LED_Label = {
+LED_LABEL = {
     LED_Mode.ORANGE: "Orange",
     LED_Mode.BLUE: "Blue"
 }
@@ -177,6 +177,25 @@ class InputMeasurement:
 class BTSmartController:
     """This class represents a BTSmart-Controller, connected via BLE"""
 
+    class _BLEScanner:
+        def __init__(self):
+            self._device = None
+            self._scanner = None
+        
+        async def _device_detected(self, device: BLEDevice, adv: AdvertisementData):
+            if device.name == 'BT Smart Controller':
+                self._device = device
+
+        async def _scan(self):
+            self.scanner = BleakScanner(self._device_detected)
+            await self.scanner.start()
+            count = 0
+            while self._device is None and count < 50:
+                count = count + 1
+                await asyncio.sleep(0.1)
+            await self.scanner.stop()
+            return self._device
+
     async def discover(autoconnect: bool = True) -> BTSmartController:
         """Start deicobery of bluetooth devices and try to find a BT-Smart Controller
 
@@ -189,19 +208,8 @@ class BTSmartController:
         Returns:
             BTSmartController: the found controller
         """
-        devices = await BleakScanner.discover(return_adv=True)
-        btSmartDevice = None
-        for d, a in devices.values():
-            if (d.name == 'BT Smart Controller'):
-                btSmartDevice = d
-        if btSmartDevice is None:
-            raise Exception("BT Smart Controller not found")
-        else:
-            print(btSmartDevice.name, "-", btSmartDevice.address)
-            return BTSmartController(btSmartDevice, autoconnect=autoconnect)
-
-    async def find(address, autoconnect: bool = True) -> BTSmartController:
-        btSmartDevice = await BleakScanner.find_device_by_address(address)
+        scanner = BTSmartController._BLEScanner()
+        btSmartDevice = await scanner._scan()
         if btSmartDevice is None:
             raise Exception("BT Smart Controller not found")
         else:
@@ -215,12 +223,23 @@ class BTSmartController:
             device (BLEDevice): the device
             autoconnect (bool, optional): should the controller automatically connect to the device. Defaults to True.
         """
-        self.client = BleakClient(device, disconnected_callback=self.on_disconnect)
+        self.client = BleakClient(device, disconnected_callback=self._disconnect_cb)
         self.autoconnect = autoconnect
         self.input_listener = {1: None, 2: None, 3: None, 4: None}
+        self.diconnect_listener = None
 
-    def on_disconnect(self, client) -> None:
-        pass
+    def _disconnect_cb(self, client) -> None:
+        """method is called, when the client is disconnectd"""
+        if self.diconnect_listener is not None:
+            self.diconnect_listener()
+    
+    def on_disconnect(self, callback) -> None:
+        """registers the given callback function to be called upon client disconnect.
+        
+        Args:
+            callback (function): the function to be called when the controller is disconnected
+        """
+        self.diconnect_listener = callback
 
     async def _handle_input_change(self, characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
         """callback that is called after a notifyable characteristic in the BLE Device changed.
@@ -273,6 +292,17 @@ class BTSmartController:
             for number in range(1, 5):
                 measureUuid = BT_SMART_GATT_UUIDs["input"]["characteristics"][number]
                 await self.client.start_notify(measureUuid, self._handle_input_change)
+            # signal a connect ba 'blinking' with the led
+            await self.set_led(LED_Mode.ORANGE)
+            await asyncio.sleep(0.5)
+            await self.set_led(LED_Mode.BLUE)
+            await asyncio.sleep(0.5)
+            await self.set_led(LED_Mode.ORANGE)
+            
+            
+            for i in range(1, 5):
+                await self.set_input_mode(i, InputMode.RESISTANCE)
+            
             return True
         else:
             raise Exception("unable to connect")
@@ -280,6 +310,9 @@ class BTSmartController:
     async def disconnect(self) -> None:
         """disconnects the controller from the BLE device"""
         if self.is_connected():
+            #for number in range(1, 5):
+            #    measureUuid = BT_SMART_GATT_UUIDs["input"]["characteristics"][number]
+            #    await self.client.stop_notify(measureUuid)
             await self.client.disconnect()
 
     async def _autoconnect(self) -> None:
@@ -289,6 +322,15 @@ class BTSmartController:
                 await self.connect()
             else:
                 raise Exception("Device not connected")
+
+    async def _read_gatt_char(self, uuid) -> bytes:
+        res = await self.client.read_gatt_char(uuid)
+        #print("r:", uuid, " -> ", res)
+        return res
+
+    async def _write_gatt_char(self, uuid, bytes, response: bool = True):
+        #print("w:", uuid, " -> ", bytes)
+        await self.client.write_gatt_char(uuid, bytes, response=True)
 
     async def get_device_information(self) -> dict[str, str]:
         """retrieves device information from the attached BT-Smart Controller
@@ -300,10 +342,22 @@ class BTSmartController:
         res = dict()
         for key, uuid in BT_SMART_GATT_UUIDs["device_info"]["characteristics"].items():
             try:
-                res[key] = await self.client.read_gatt_char(uuid)
+                res[key] = await self._read_gatt_char(uuid)
             except:
                 pass
         return res
+
+    async def get_battery_level(self) -> int:
+        """retrieves the battery level of the device
+
+        Returns:
+            int: the battery level
+        """
+        await self._autoconnect()
+        uuid = BT_SMART_GATT_UUIDs["battery"]["characteristics"]["level"]
+        m_bts = await self._read_gatt_char(uuid)
+        value = int.from_bytes(m_bts, 'little', signed=False)
+        return value
 
     async def set_led(self, led: LED_Mode) -> None:
         """choses the LED on the controller
@@ -313,7 +367,7 @@ class BTSmartController:
         """
         ledUuid = BT_SMART_GATT_UUIDs["led"]["characteristics"]["color"]
         bts = led.value
-        await self.client.write_gatt_char(ledUuid, bts)
+        await self._write_gatt_char(ledUuid, bts)
 
     async def get_led(self) -> LED_Mode:
         """get the currently used LED
@@ -322,8 +376,7 @@ class BTSmartController:
             LED_Mode: the currently used LED
         """
         ledUuid = BT_SMART_GATT_UUIDs["led"]["characteristics"]["color"]
-        bts = await self.client.read_gatt_char(ledUuid)
-        print(">>>led: ", bts)
+        bts = await self._read_gatt_char(ledUuid)
         led = LED_Mode.from_bytes(bts)
         return led
 
@@ -333,9 +386,17 @@ class BTSmartController:
             raise Exception("invalid input number - must be in 1..4")
         unitUuid = BT_SMART_GATT_UUIDs["input_mode"]["characteristics"][number]
         u_bts = unit.value
-        await self.client.write_gatt_char(unitUuid, u_bts)
+        await self._write_gatt_char(unitUuid, u_bts)
 
-    async def get_input(self, number: int, unit: InputMode = None) -> InputMeasurement:
+    async def get_input_mode(self, number: int) -> InputMode:
+        """retrieves the currently set input mode of the given input"""
+        if number < 1 or number > 4:
+            raise Exception("invalid input number - must be in 1..4")
+        unitUuid = BT_SMART_GATT_UUIDs["input_mode"]["characteristics"][number]
+        u_bts = await self._read_gatt_char(unitUuid)
+        return InputMode.from_bytes(u_bts)
+
+    async def get_input_value(self, number: int, unit: InputMode = None) -> InputMeasurement:
         """retrieves the current measure on the given input
 
         Args:
@@ -353,14 +414,11 @@ class BTSmartController:
         unitUuid = BT_SMART_GATT_UUIDs["input_mode"]["characteristics"][number]
         measureUuid = BT_SMART_GATT_UUIDs["input"]["characteristics"][number]
         if unit is not None:
-            u_bts = unit.value
-            await self.client.write_gatt_char(unitUuid, u_bts)
-        else:
-            u_bts = await self.client.read_gatt_char(unitUuid)
-            unit = InputMode.from_bytes(u_bts)
-        m_bts = await self.client.read_gatt_char(measureUuid)
+            await self.set_input_mode(number, unit)
+        r_unit = await self.get_input_mode(number)
+        m_bts = await self._read_gatt_char(measureUuid)
         value = int.from_bytes(m_bts, 'little', signed=False)
-        return InputMeasurement(value, unit)
+        return InputMeasurement(value, r_unit)
 
     def on_input_change(self, number: int, callback) -> None:
         """registers a listener for the given input. Currently, there is only one listener allowed.
@@ -393,8 +451,9 @@ class BTSmartController:
             raise Exception("invalid input number - must be in 1..2")
         if value < int(-100) or value > int(100):
             raise Exception("motor output must be in -100..100")
-        bts = value.to_bytes(2, 'little', signed=True)
-        await self.client.write_gatt_char(BT_SMART_GATT_UUIDs["output"]["characteristics"][number], bts)
+        char_uuid = BT_SMART_GATT_UUIDs["output"]["characteristics"][number]
+        bts = value.to_bytes(1, 'little', signed=True)
+        await self._write_gatt_char(char_uuid, bts)
 
     async def get_output_value(self, number: int) -> int:
         """retrieves the current output value
@@ -410,6 +469,7 @@ class BTSmartController:
         """
         if number < 1 or number > 2:
             raise Exception("invalid input number - must be in 1..2")
-        bts = await self.client.read_gatt_char(BT_SMART_GATT_UUIDs["output"]["characteristics"][number])
-        value = int.from_bytes(bts, 'little', signed=False)
+        char_uuid = BT_SMART_GATT_UUIDs["output"]["characteristics"][number]
+        bts = await self._read_gatt_char(char_uuid)
+        value = int.from_bytes(bts, 'little', signed=True)
         return value
