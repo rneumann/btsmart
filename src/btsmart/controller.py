@@ -10,6 +10,7 @@ The module heavily relies on asyncio
 Todo:
     * Test Cross-OS compatibility
     * Reading output values does not yet work (currently only workaround)
+    * make BTController a singleton
 
 """
 

@@ -21,7 +21,7 @@ Locally install the created package
 Uploading the package to pypi
 
 .. code-block:: sh
-    
+
     twine upload dist/btsmart-$(ver)*
 
 And this is how to install the result
