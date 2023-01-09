@@ -3,7 +3,7 @@
 #
 
 import asyncio
-from btsmart import BTSmartController, LED_Mode, LED_LABEL, InputMode, InputMeasurement, INPUT_MODE_LABEL
+from btsmart import BTSmartController, LEDMode, LED_LABEL, InputMode, InputMeasurement, INPUT_MODE_LABEL
 
 async def main():
 
@@ -38,7 +38,7 @@ async def main():
     color = LED_LABEL[await btSmart.get_led()]
     print("color", color)
     print("setting to orange...")
-    await btSmart.set_led(LED_Mode.ORANGE)
+    await btSmart.set_led(LEDMode.ORANGE)
     color = LED_LABEL[await btSmart.get_led()]
     print("color", color)
 

@@ -17,9 +17,8 @@ async def button_released():
     print("Button released")
     await dim.set_level(0)
 
-btn.pressed = button_pressed
-btn.released = button_released
-
+btn.on_press(button_pressed)
+btn.on_release(button_released)
 
 async def main():
 

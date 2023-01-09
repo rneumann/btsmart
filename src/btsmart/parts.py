@@ -9,6 +9,7 @@ according logic.
 Todo:
     * Add more convenience functionality - more parts
     * need an ideo of how to automatically set the right iput mode for a part (protocol problem with attach and connect)
+    * needs more documentation
 
 """
 
@@ -16,20 +17,36 @@ import asyncio
 from .controller import BTSmartController, InputMode
 
 class ElectronicsPart:
+    """Simple base class for all representatives of electronical parts that might be attached to a controller.
+       These classes are just for convenience.
+    """
+    
     def __init__(self) -> None:
         self.controller: BTSmartController = None
 
     def is_attached(self) -> bool:
+        """tells if th epart is already attached to the controller or not"""
         return self.controller is not None
 
 
 class InputPart(ElectronicsPart):
+    """Represents input parts, i.e. parts attached to the input-connectors."""
+    
     def __init__(self) -> None:
         super().__init__()
         self.inputValueChanged = None
         self.lastValue: int = None
 
     def attach(self, ctrl: BTSmartController, number: int) -> None:
+        """attaches the part to the given controller and the specified input port
+
+        Args:
+            ctrl (BTSmartController): the controller to attach the part to
+            number (int): the input port (1..4)
+
+        Raises:
+            Exception: if no controller is specified or the input number is invalid
+        """
         if ctrl is None:
             raise Exception("cannot attach InputPart to 'None'")
         if number < 1 or number > 4:
@@ -38,15 +55,32 @@ class InputPart(ElectronicsPart):
         self.controller = ctrl
 
     async def _on_input_change_(self, num, value) -> None:
+        """this method is called, when the input value changes on the controller.
+        This method sould be overrridden in subclasses - it does nothing here.
+        Args:
+            num (_type_): the number of the input
+            value (_type_): the new value
+        """
         pass
 
 
 class OutputPart(ElectronicsPart):
+    """Represents output parts, i.e. parts attached to the output-connectors."""
+    
     def __init__(self) -> None:
         super().__init__()
         self.lastValue: int = None
 
     def attach(self, ctrl: BTSmartController, number: int) -> None:
+        """attaches the part to the given controller and the specified output port
+
+        Args:
+            ctrl (BTSmartController): the controller to attach the part to
+            number (int): the output port (1..2)
+
+        Raises:
+            Exception: if no controller is specified or the output number is invalid
+        """
         if ctrl is None:
             raise Exception("cannot attach Part to 'None'")
         if number < 1 or number > 2:
@@ -56,6 +90,8 @@ class OutputPart(ElectronicsPart):
 
 
 class Switch(InputPart):
+    """Representation of a electrical switch, i.e. an elemnt that is either open or closed. Sitches might be buttons or light barriers"""
+    
     def __init__(self) -> None:
         super().__init__()
         self.threshold = 200
@@ -65,6 +101,11 @@ class Switch(InputPart):
 #        ctrl.set_input_mode(number, InputMode.RESISTANCE)
 
     def is_open(self) -> bool:
+        """determine if the switch is currently open
+
+        Returns:
+            bool: if the switch is currently open
+        """
         if self.lastValue is not None:
             return self.lastValue.value < self.threshold
         else:
@@ -72,12 +113,38 @@ class Switch(InputPart):
 
 
 class Button(Switch):
+    """A special variant of the switch that can be pressed or released.
+    In later versions there might also be such things as double-click, long-click or whatever..."""
+    
     def __init__(self) -> None:
         super().__init__()
-        self.pressed = None  # callback function without parameters
-        self.released = None  # callback function without parameters
+        self._pressed = None  # callback function without parameters
+        self._released = None  # callback function without parameters
+
+    def on_press(self, callback) -> None:
+        """register a function to be called when the button is pressed.
+        A pressed button is detected by low resistance.
+
+        Args:
+            callback (function): the (parameterless) function to be called
+        """
+        self._pressed = callback
+
+    def on_release(self, callback) -> None:
+        """register a function to be called when the button is released.
+        A pressed button is detected by high resistance.
+
+        Args:
+            callback (function): the (parameterless) function to be called
+        """
+        self._released = callback
 
     def is_pressed(self) -> bool:
+        """determine if the button is currently pressed
+
+        Returns:
+            bool: if the button is pressed
+        """
         if self.lastValue is not None:
             return self.lastValue.value < self.threshold
         else:
@@ -88,58 +155,99 @@ class Button(Switch):
         self.lastValue = value
         if value < self.threshold:
             if oldval is None or oldval > self.threshold:
-                if self.pressed is not None:
-                    if asyncio.iscoroutinefunction(self.pressed):
-                        await self.pressed()
+                if self._pressed is not None:
+                    if asyncio.iscoroutinefunction(self._pressed):
+                        await self._pressed()
                     else:
-                        self.pressed()
+                        self._pressed()
         else:
             if oldval is not None and oldval <= self.threshold:
-                if self.released is not None:
-                    if asyncio.iscoroutinefunction(self.pressed):
-                        await self.released()
+                if self._released is not None:
+                    if asyncio.iscoroutinefunction(self._released):
+                        await self._released()
                     else:
-                        self.released()
+                        self._released()
 
 
 class LightBarrier(Switch):
     def __init__(self) -> None:
         super().__init__()
-        self.opened = None
-        self.interrupted = None
+        self._opened = None
+        self._interrupted = None
+
+    def on_interrupt(self, callback) -> None:
+        """register a function to be called when the light barrier is interrupted.
+        This is detected by high resistance.
+
+        Args:
+            callback (function): the (parameterless) function to be called
+        """
+        self._interrupted = callback
+
+    def on_release(self, callback) -> None:
+        """register a function to be called when the light barrier is opened again.
+        This is detected by low resistance.
+
+        Args:
+            callback (function): the (parameterless) function to be called
+        """
+        self._opened = callback
+
 
     async def _on_input_change_(self, num, value) -> None:
         oldval = self.lastValue
         self.lastValue = value
         if value < self.threshold:
             if oldval is None or oldval > self.threshold:
-                if self.opened is not None:
-                    self.opened()
+                if self._opened is not None:
+                    if asyncio.iscoroutinefunction(self._opened):
+                        await self._opened()
+                    else:
+                        self._opened()
         else:
             if oldval is not None and oldval <= self.threshold:
-                if self.interrupted is not None:
-                    self.interrupted()
+                if self._interrupted is not None:
+                    if asyncio.iscoroutinefunction(self._interrupted):
+                        await self._interrupted()
+                    else:
+                        self._interrupted()
 
 
 class Dimmer(OutputPart):
+    """represents a dimmable part (e.g. a simple light) attached to an output port"""
+    
     def __init__(self) -> None:
         super().__init__()
         self.outpin = 0
 
     async def set_level(self, level) -> None:
+        """Sets the output level for the dimmer.
+
+        Args:
+            level (_type_): must be avalue between 0 and 100
+
+        Raises:
+            Exception: if the dimmer is not yet attached or the level is wrong
+        """
         if not self.is_attached():
             raise Exception("Dimmer not attached to controller")
-        if self.outpin < 1 or self.outpin > 2:
-            raise Exception("Dimmer not correctly attached to controller output (must be 1 or 2)")
         if level < 0 or level > 100:
             raise Exception("Invalid dimmer value - must be in 0..100")
         await self.controller.set_output_value(self.outpin, level)
 
     async def blink(self, level: int = 100, time: float = 0.2, count: int = 1) -> None:
+        """makes the attached lamp blink
+
+        Args:
+            level (int, optional): the brightness (see level). Defaults to 100.
+            time (float, optional): the interval duration. Defaults to 0.2.
+            count (int, optional): the number ob blinks. Defaults to 1.
+
+        Raises:
+            Exception: if one of the given values is invalid or the dimmer is not attached to the controller
+        """
         if not self.is_attached():
             raise Exception("Dimmer not attached to controller")
-        if self.outpin < 1 or self.outpin > 2:
-            raise Exception("Dimmer not correctly attached to controller output (must be 1 or 2)")
         if level < 0 or level > 100:
             raise Exception("Invalid dimmer value - must be in 0..100")
         if time <= 0.0:
@@ -148,17 +256,20 @@ class Dimmer(OutputPart):
             raise Exception("Invalid count - must be greater than 0")
         for c in range(count):
             await self.controller.set_output_value(self.outpin, level)
-            print("1")
             await asyncio.sleep(time)
             await self.controller.set_output_value(self.outpin, 0)
-            print("0")
             if c < count - 1:
                 await asyncio.sleep(time)
 
 
 class MotorXM(OutputPart):
+    """represents a motor that is attachd to one of the outputs. The motor accepts RPM-values rather than 'levels'"""
+    
     FORWARD = True
+    """direction constant for the motor representing forward run"""
+    
     BACKWARD = False
+    """direction constant for the motor representing backward run"""
 
     def __init__(self) -> None:
         super().__init__()
@@ -170,10 +281,18 @@ class MotorXM(OutputPart):
         return int(rpm / 3.38)
 
     async def run_at(self, speed: int, direction: bool = FORWARD, time: float = 0.0) -> None:
+        """run the motor at the given speed and direction for the given time.
+
+        Args:
+            speed (int): the speed in RPM (must be in 0..338)
+            direction (bool, optional): the direction. Defaults to FORWARD.
+            time (float, optional): if specified, the motor is automaticallly stopped after that time. Defaults to 0.0.
+
+        Raises:
+            Exception: if one of the parameters is invalid or the motor is not attached to the controller
+        """
         if not self.is_attached():
-            raise Exception("Dimmer not attached to controller")
-        if self.outpin < 1 or self.outpin > 2:
-            raise Exception("Dimmer not correctly attached to controller output (must be 1 or 2)")
+            raise Exception("Motor not attached to controller")
         if speed < 0 or speed > 338:
             raise Exception("Invalid speed value - must be in 0..338")
         if time < 0.0:

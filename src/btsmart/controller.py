@@ -80,7 +80,7 @@ BT_SMART_GATT_UUIDs = {
 
 # ----------------- some forward declarations ----------------
 
-class LED_Mode(Enum):
+class LEDMode(Enum):
     pass
 
 
@@ -98,31 +98,31 @@ class BTSmartController:
 
 # ----------------- relevant classes start here ------------------------
 
-class LED_Mode(Enum):
+class LEDMode(Enum):
     """Enumeration of the BTSmart internal LED Colors"""
     BLUE = bytearray(b'\x00')
     ORANGE = bytearray(b'\x01')
 
-    def from_bytes(b: bytes) -> LED_Mode:
+    def from_bytes(b: bytes) -> LEDMode:
         """derive the color from a given binary representation (received via BLE)
 
         Args:
             b (bytes): the bytes received via BLE (attributes read)
 
         Returns:
-            LED_Mode: the according color or None in case the bytes do not hold a valid represnetation
+            LEDMode: the according color or None in case the bytes do not hold a valid represnetation
         """
-        if b == LED_Mode.ORANGE.value:
-            return LED_Mode.ORANGE
+        if b == LEDMode.ORANGE.value:
+            return LEDMode.ORANGE
         else:
-            if b == LED_Mode.BLUE.value:
-                return LED_Mode.BLUE
+            if b == LEDMode.BLUE.value:
+                return LEDMode.BLUE
             else:
                 return None
 
 LED_LABEL = {
-    LED_Mode.ORANGE: "Orange",
-    LED_Mode.BLUE: "Blue"
+    LEDMode.ORANGE: "Orange",
+    LEDMode.BLUE: "Blue"
 }
 
 
@@ -291,13 +291,16 @@ class BTSmartController:
         if self.is_connected():
             for number in range(1, 5):
                 measureUuid = BT_SMART_GATT_UUIDs["input"]["characteristics"][number]
-                await self.client.start_notify(measureUuid, self._handle_input_change)
+                try:
+                    await self.client.start_notify(measureUuid, self._handle_input_change)
+                except:
+                    pass
             # signal a connect ba 'blinking' with the led
-            await self.set_led(LED_Mode.ORANGE)
+            await self.set_led(LEDMode.ORANGE)
             await asyncio.sleep(0.5)
-            await self.set_led(LED_Mode.BLUE)
+            await self.set_led(LEDMode.BLUE)
             await asyncio.sleep(0.5)
-            await self.set_led(LED_Mode.ORANGE)
+            await self.set_led(LEDMode.ORANGE)
             
             
             for i in range(1, 5):
@@ -359,25 +362,25 @@ class BTSmartController:
         value = int.from_bytes(m_bts, 'little', signed=False)
         return value
 
-    async def set_led(self, led: LED_Mode) -> None:
+    async def set_led(self, led: LEDMode) -> None:
         """choses the LED on the controller
 
         Args:
-            led (LED_Mode): the LED to be used
+            led (LEDMode): the LED to be used
         """
         ledUuid = BT_SMART_GATT_UUIDs["led"]["characteristics"]["color"]
         bts = led.value
         await self._write_gatt_char(ledUuid, bts)
 
-    async def get_led(self) -> LED_Mode:
+    async def get_led(self) -> LEDMode:
         """get the currently used LED
 
         Returns:
-            LED_Mode: the currently used LED
+            LEDMode: the currently used LED
         """
         ledUuid = BT_SMART_GATT_UUIDs["led"]["characteristics"]["color"]
         bts = await self._read_gatt_char(ledUuid)
-        led = LED_Mode.from_bytes(bts)
+        led = LEDMode.from_bytes(bts)
         return led
 
     async def set_input_mode(self, number: int, unit: InputMode) -> None:
