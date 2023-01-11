@@ -198,7 +198,7 @@ class BTSmartController:
             return self._device
 
     async def discover(autoconnect: bool = True) -> BTSmartController:
-        """Start deicobery of bluetooth devices and try to find a BT-Smart Controller
+        """Start discovery of bluetooth devices and try to find a BT-Smart Controller
 
         Args:
             autoconnect (bool, optional): tells the controller to automatically connect if disconnected before performing any command. Defaults to True.
