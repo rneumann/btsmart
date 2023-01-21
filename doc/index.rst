@@ -10,6 +10,8 @@ The project is hosted on GitHub_.
 
    controller
    parts
+   backend_ble
+   backend_usb
 
 
 Indices and tables

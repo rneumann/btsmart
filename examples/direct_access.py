@@ -1,5 +1,5 @@
 import asyncio
-from btsmart import BTSmartController, LEDMode, InputMode, InputMeasurement
+from btsmart import discoverBTSmart, BTSmartController, LEDMode, InputMode, InputMeasurement
 
 #------------------------------------------------------------------------------------------------------------
 
@@ -7,8 +7,7 @@ async def main():
 
     btSmart = None
     try:
-        btSmart = await BTSmartController.discover()
-        #btSmart = await BTSmartController.find("E709050F-1FC3-E7E5-5673-AE53568A1425")
+        btSmart = await discoverBTSmart()
     except Exception as e:
         print("unable to find controller - press the button")
         print(e)

@@ -262,7 +262,7 @@ class Dimmer(OutputPart):
                 await asyncio.sleep(time)
 
 
-class MotorXM(OutputPart):
+class MotorXS(OutputPart):
     """represents a motor that is attachd to one of the outputs. The motor accepts RPM-values rather than 'levels'"""
     
     FORWARD = True
@@ -298,7 +298,7 @@ class MotorXM(OutputPart):
         if time < 0.0:
             raise Exception("time must be greater or equal to 0.0")
         level = self._rpm_to_level(speed)
-        if direction == MotorXM.BACKWARD:
+        if direction == MotorXS.BACKWARD:
             level = -level
         await self.controller.set_output_value(self.outpin, level)
         if time > 0.0:
