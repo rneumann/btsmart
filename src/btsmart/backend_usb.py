@@ -46,15 +46,14 @@ class BTSmartFTDI:
         self.ftdi = ftdi
         self._set_test_mode(True)
         self._set_led(BTSmartFTDI._LED_BLUE)
-        for i in range(0,4):
-            self._config_input(i, BTSmartFTDI._CFG_IN_OHM)
+        #for i in range(0,4):
+        #    self._config_input(i, BTSmartFTDI._CFG_IN_OHM)
         self._get_inputs()
         self._get_inputs()
 
     def _send_msg(self, msg: bytes, response_len: int):
         ftdi = self.ftdi
         #print("msg: ", msg.hex())
-        #ftdi.purge_buffers()
         l = ftdi.write_data(msg)
         if l != len(msg):
             raise Exception("could not send all the mesage bytes")
@@ -114,8 +113,8 @@ class BTSmartFTDI:
 
     def _config_input(self, input: int, mode: int) -> bool:
         ftdi = self.ftdi
-        #print("Config Input")
-        msg = b"".join([BTSmartFTDI._SOF, BTSmartFTDI._CMD_CFG_INPUTS, b'\x00\x02', input.to_bytes(1, 'little'), mode])
+        #print("Config Input", input, mode, type(mode))
+        msg = b"".join([BTSmartFTDI._SOF, BTSmartFTDI._CMD_CFG_INPUTS, b'\x00\x02', input.to_bytes(1, 'little'), mode.to_bytes(1, 'little', signed=False)])
         resp = self._send_msg(msg, 9)
         if len(resp) == 9:
             err = int.from_bytes(resp[8:9], 'little', signed=False)
@@ -163,13 +162,16 @@ class BTSmartController_USB(BTSmartController):
     async def discover() -> BTSmartController:
         dd = UsbDeviceDescriptor(8733, 5, None, None, None, 0, None)
         try:
+            #print("Looking for:", dd)
             dev = UsbTools.get_device(dd)
+            #print("Found:", dev)
             if dev is None:
                 return None
             ftdi = Ftdi()
             ftdi.open_from_device(dev, 1)
             ftdi.set_baudrate(115200)
             btFtdi = BTSmartFTDI(ftdi)
+            #print("FTDI:", ftdi)
             return BTSmartController_USB(btFtdi)
         except:
             return None
@@ -198,7 +200,7 @@ class BTSmartController_USB(BTSmartController):
         print("coroutine ended")
             
     async def connect(self) -> bool:
-        self.reset()
+        await self.reset()
         self.dev._set_test_mode()
         await asyncio.sleep(0)
         print("started polling")
@@ -237,11 +239,11 @@ class BTSmartController_USB(BTSmartController):
             newI = self._inputs[i]
             newV = newI['val']
             if oldV != newV:
-                print("X", i, newV)
-                asyncio.create_task(self._on_input_value_changed(i+1, newV))
+                #print("X", i, newV)
+                asyncio.create_task(self._on_input_value_changed(input, newV))
 
     async def set_input_mode(self, input: Input, mode: InputMode) -> None:
-        self.dev._config_input(input.value, mode._value_)
+        self.dev._config_input(input.value, mode.value)
         await self._update_inputs()
 
     async def get_input_mode(self, input: Input) -> InputMode:
@@ -253,15 +255,19 @@ class BTSmartController_USB(BTSmartController):
         else:
             return InputMode.RESISTANCE
 
-    async def get_input_value(self, input: Input, unit: InputMode = None) -> InputMeasurement:
-        if not self._is_polling:
-            await self._update_inputs()
+    async def get_input_value(self, input: Input, mode: InputMode = None) -> InputMeasurement:
         inp = self._inputs[input.value]
         if inp['cfg'] == BTSmartFTDI._CFG_IN_VOLT:
             m = InputMode.VOLTAGE
         else:
             m = InputMode.RESISTANCE
-        return InputMeasurement(inp['val'], m)
+        if m != mode:
+            print("switching mode to", mode)
+        else:
+            if not self._is_polling:
+                await self._update_inputs()
+        inp = self._inputs[input.value]
+        return InputMeasurement(inp['val'], mode)
 
     async def set_output_value(self, output: Output, value: int) -> None:
         if value < int(-100) or value > int(100):

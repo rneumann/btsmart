@@ -14,7 +14,7 @@ Todo:
 """
 
 import asyncio
-from .controller import BTSmartController, InputMode
+from .controller import BTSmartController, Input, InputMode, Output
 
 class ElectronicsPart:
     """Simple base class for all representatives of electronical parts that might be attached to a controller.
@@ -37,28 +37,26 @@ class InputPart(ElectronicsPart):
         self.inputValueChanged = None
         self.lastValue: int = None
 
-    def attach(self, ctrl: BTSmartController, number: int) -> None:
+    def attach(self, ctrl: BTSmartController, input: Input) -> None:
         """attaches the part to the given controller and the specified input port
 
         Args:
             ctrl (BTSmartController): the controller to attach the part to
-            number (int): the input port (1..4)
+            input (Input): the input (I1..I4)
 
         Raises:
-            Exception: if no controller is specified or the input number is invalid
+            Exception: if no controller is specified
         """
         if ctrl is None:
             raise Exception("cannot attach InputPart to 'None'")
-        if number < 1 or number > 4:
-            raise Exception("invalid input number - must be in 1..4")
-        ctrl.on_input_change(number, self._on_input_change_)
+        ctrl.on_input_change(input, self._on_input_change_)
         self.controller = ctrl
 
-    async def _on_input_change_(self, num, value) -> None:
+    async def _on_input_change_(self, input, value) -> None:
         """this method is called, when the input value changes on the controller.
         This method sould be overrridden in subclasses - it does nothing here.
         Args:
-            num (_type_): the number of the input
+            num (_type_): the input (I1..I4)
             value (_type_): the new value
         """
         pass
@@ -70,22 +68,21 @@ class OutputPart(ElectronicsPart):
     def __init__(self) -> None:
         super().__init__()
         self.lastValue: int = None
+        self.outpin = Output.O1
 
-    def attach(self, ctrl: BTSmartController, number: int) -> None:
+    def attach(self, ctrl: BTSmartController, output: Output) -> None:
         """attaches the part to the given controller and the specified output port
 
         Args:
             ctrl (BTSmartController): the controller to attach the part to
-            number (int): the output port (1..2)
+            outpt (Output): the output port (O1..O2)
 
         Raises:
-            Exception: if no controller is specified or the output number is invalid
+            Exception: if no controller is specified
         """
         if ctrl is None:
             raise Exception("cannot attach Part to 'None'")
-        if number < 1 or number > 2:
-            raise Exception("invalid input number - must be in 1..2")
-        self.outpin = number
+        self.outpin = output
         self.controller = ctrl
 
 
@@ -95,10 +92,6 @@ class Switch(InputPart):
     def __init__(self) -> None:
         super().__init__()
         self.threshold = 200
-
-#    def attach(self, ctrl: BTSmartController, number: int) -> None:
-#        super().attach(ctrl, number)
-#        ctrl.set_input_mode(number, InputMode.RESISTANCE)
 
     def is_open(self) -> bool:
         """determine if the switch is currently open
@@ -150,7 +143,7 @@ class Button(Switch):
         else:
             return False
 
-    async def _on_input_change_(self, num, value) -> None:
+    async def _on_input_change_(self, input: Input, value: int) -> None:
         oldval = self.lastValue
         self.lastValue = value
         if value < self.threshold:
@@ -194,7 +187,7 @@ class LightBarrier(Switch):
         self._opened = callback
 
 
-    async def _on_input_change_(self, num, value) -> None:
+    async def _on_input_change_(self, input: Input, value: int) -> None:
         oldval = self.lastValue
         self.lastValue = value
         if value < self.threshold:
@@ -218,7 +211,6 @@ class Dimmer(OutputPart):
     
     def __init__(self) -> None:
         super().__init__()
-        self.outpin = 0
 
     async def set_level(self, level) -> None:
         """Sets the output level for the dimmer.
@@ -265,6 +257,8 @@ class Dimmer(OutputPart):
 class MotorXS(OutputPart):
     """represents a motor that is attachd to one of the outputs. The motor accepts RPM-values rather than 'levels'"""
     
+    MAX_RPM = 5000
+    """maximum rounds per minute"""
     FORWARD = True
     """direction constant for the motor representing forward run"""
     
@@ -275,16 +269,16 @@ class MotorXS(OutputPart):
         super().__init__()
 
     def _level_to_rpm(self, level) -> int:
-        return int(level * 3.38)
+        return int(level * MotorXS.MAX_RPM / 100)
 
     def _rpm_to_level(self, rpm) -> int:
-        return int(rpm / 3.38)
+        return int(rpm / MotorXS.MAX_RPM * 100)
 
     async def run_at(self, speed: int, direction: bool = FORWARD, time: float = 0.0) -> None:
         """run the motor at the given speed and direction for the given time.
 
         Args:
-            speed (int): the speed in RPM (must be in 0..338)
+            speed (int): the speed in RPM (must be in 0..MAX_RPM)
             direction (bool, optional): the direction. Defaults to FORWARD.
             time (float, optional): if specified, the motor is automaticallly stopped after that time. Defaults to 0.0.
 
@@ -293,8 +287,8 @@ class MotorXS(OutputPart):
         """
         if not self.is_attached():
             raise Exception("Motor not attached to controller")
-        if speed < 0 or speed > 338:
-            raise Exception("Invalid speed value - must be in 0..338")
+        if speed < 0 or speed > MotorXS.MAX_RPM:
+            raise Exception("Invalid speed value - must be in 0.." + str(MotorXS.MAX_RPM))
         if time < 0.0:
             raise Exception("time must be greater or equal to 0.0")
         level = self._rpm_to_level(speed)

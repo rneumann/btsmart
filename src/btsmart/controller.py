@@ -59,25 +59,33 @@ LED_LABEL = {
 }
 
 class Input(Enum):
+    """enumeration of the inputs - API-Calls should use these elements rather than the 'raw' values"""
     I1 = 0
     I2 = 1
     I3 = 2
     I4 = 3
 
     def all() -> list:
+        """returns the list of the inputs for use in loops"""
         return [Input.I1, Input.I2, Input.I3, Input.I4]
 
 class Output(Enum):
+    """enumeration of the outputs - API-Calls should use these elements rather than the 'raw' values"""
     O1 = 0
     O2 = 1
 
     def all() -> list:
+        """returns the list of the outputs for use in loops"""
         return [Output.O1, Output.O2]
 
 class InputMode(Enum):
     """Enumeration of the input measurement modes"""
+    
     VOLTAGE = 10
+    """represents voltage measurement at a specific input"""
+    
     RESISTANCE = 11
+    """represents resistance measurement at a specific iput"""
 
     def from_bytes(b: bytes) -> InputMode:
         """derive the input mode from a given binary representation (received via BLE)
@@ -130,7 +138,7 @@ class InputMeasurement:
 
 
 class BTSmartController:
-    """This class represents a BTSmart-Controller"""
+    """Abstract class that represents a BTSmart Controller."""
 
     def __init__(self) -> None:
         self.input_listener = {Input.I1: None, Input.I2: None, Input.I3: None, Input.I4: None}
@@ -157,24 +165,32 @@ class BTSmartController:
         in turn notifies the registered input listener.
 
         Args:
-            input (Input): the input number (I1..I4)
+            input (Input): the input (I1..I4)
             value (int): the new value
         """
         callback = self.input_listener[input]
-        #print("input changed", input, callback)
+        #print("input changed", input, value, callback)
         if callback is not None:
             try:
                 if asyncio.iscoroutinefunction(callback):
                     await callback(input, value)
                 else:
                     callback(input, value)
-            except:
-                pass
+            except Exception as ex:
+                print("error in callback:", ex)
 
     def is_connected(self) -> bool:
+        """indicates whether or not the controller is currently connected.
+        
+        This method must be implemented in derived classes
+
+        Returns:
+            bool: True iff the controller is connected
+        """
         raise NotImplemented
 
     async def reset(self):
+        """Resets the controller to a defined start setting. This method is called after the controller is connected."""
         await self.set_led(LEDMode.YELLOW)
         await asyncio.sleep(0.2)
         await self.set_led(LEDMode.BLUE)
@@ -184,16 +200,36 @@ class BTSmartController:
             await self.set_input_mode(i, InputMode.RESISTANCE)
 
     async def connect(self) -> bool:
+        """Connects the logical controller to the device using the according backend.
+
+        This method must be implemented in derived classes
+
+        Returns:
+            bool: True iff the controller has been connected
+        """
         raise NotImplemented
             
     async def disconnect(self) -> None:
+        """Disconnevts the controller instance from tha according device
+
+        This method must be implemented in derived classes
+        """
         raise NotImplemented
 
     async def get_device_information(self) -> dict[str, str]:
+        """retrieves information about hthe underlying physical device
+
+        This method must be implemented in derived classes
+
+        Returns:
+            dict[str, str]: descriptive information about the controller
+        """
         raise NotImplemented
 
     async def get_battery_level(self) -> int:
         """retrieves the battery level of the device
+
+        This method must be implemented in derived classes
 
         Returns:
             int: the battery level
